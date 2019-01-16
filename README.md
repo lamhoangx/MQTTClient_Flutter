@@ -8,8 +8,11 @@ Extends from https://github.com/shamblett/mqtt_client/tree/master/example/flutte
 You can install packages mqtt_client from the command line:
     `$ flutter packages get`
     
+## Screenshots
+<img src="screenshots/full.png" height="400" alt="Screenshots"/>
+
 ## Video
-[![Watch the video](https://img)](https://youtu.be/ZDa0UNjTGzw)
+https://youtu.be/ZDa0UNjTGzw
 
 
 ## 
