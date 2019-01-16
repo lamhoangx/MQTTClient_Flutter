@@ -1,4 +1,4 @@
-# MQTT Connection Client Sample 
+# MQTT Connection Sample 
 Mobile's App is written by Flutter.
 Demonstrates how to use [mqtt_client](https://pub.dartlang.org/packages/mqtt_client) with [Flutter](https://flutter.io/).
 <br>
