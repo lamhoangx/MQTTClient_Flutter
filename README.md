@@ -8,9 +8,9 @@ Extends from https://github.com/shamblett/mqtt_client/tree/master/example/flutte
 You can install packages mqtt_client from the command line:
     `$ flutter packages get`
     
-## Screenshots
+## Video
+[![Watch the video](https://img)](https://youtu.be/ZDa0UNjTGzw)
 
-<img src="screenshots/1-launch.png" height="400" alt="Screenshot"/> <img src="screenshots/2-devices.png" height="400" alt="Screenshot"/> <img src="screenshots/3-chat.png" height="400" alt="Screenshot"/>
 
 ## 
 You can setup a server through [cloundmqtt](https://cloudmqtt.com) or [mosquitto](http://test.mosquitto.org/) for the testing.
