@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mqtt_client/mqtt_client.dart' as mqtt;
+import 'package:mqtt_client/mqtt_server_client.dart' as mqtt;
 
 class SendMessageDialog extends StatefulWidget {
-  final mqtt.MqttClient client;
+  final mqtt.MqttServerClient? client;
 
-  const SendMessageDialog({Key key, @required this.client}) : super(key: key);
+  const SendMessageDialog({super.key, required this.client});
 
   @override
-  _SendMessageDialogState createState() => _SendMessageDialogState();
+  State<SendMessageDialog> createState() => _SendMessageDialogState();
 }
 
 class _SendMessageDialogState extends State<SendMessageDialog> {
@@ -16,103 +17,123 @@ class _SendMessageDialogState extends State<SendMessageDialog> {
   bool _retainValue = false;
   bool _saveNeeded = false;
   int _qosValue = 0;
-  String _messageContent;
-  String _topicContent;
+  String _messageContent = '';
+  String _topicContent = '';
 
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('New message'), actions: <Widget>[
-        FlatButton(
-            child: Text('SEND',
-                style: theme.textTheme.body1.copyWith(color: Colors.white)),
+      appBar: AppBar(
+        title: const Text('New message'),
+        actions: <Widget>[
+          TextButton(
+            child: Text(
+              'SEND',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onPrimary),
+            ),
             onPressed: () {
-              if (_formKey.currentState.validate()) {
-                _formKey.currentState.save();
+              if (_formKey.currentState!.validate()) {
+                _formKey.currentState!.save();
                 _sendMessage();
               }
-            })
-      ]),
-      body: Form(
-        key: _formKey,
-        onWillPop: _onWillPop,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              alignment: Alignment.bottomLeft,
-              child: TextFormField(
-                decoration:
-                    const InputDecoration(labelText: 'Message', filled: true),
-                style: theme.textTheme.headline,
-                maxLines: 2,
-                validator: (value) {
-                  if (value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                },
-                onSaved: (String value) {
-                  setState(() {
-                    _hasMessage = value.isNotEmpty;
-                    if (_hasMessage) {
-                      _messageContent = value;
+            },
+          ),
+        ],
+      ),
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) {
+            return;
+          }
+          _onWillPop();
+        },
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                alignment: Alignment.bottomLeft,
+                child: TextFormField(
+                  decoration:
+                      const InputDecoration(labelText: 'Message', filled: true),
+                  style: theme.textTheme.headlineSmall,
+                  maxLines: 2,
+                  validator: (String? value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Please enter some text';
                     }
-                  });
-                },
+                    return null;
+                  },
+                  onSaved: (String? value) {
+                    setState(() {
+                      _hasMessage = value?.isNotEmpty ?? false;
+                      if (_hasMessage) {
+                        _messageContent = value!;
+                      }
+                    });
+                  },
+                ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              alignment: Alignment.bottomLeft,
-              child: TextFormField(
-                decoration:
-                    const InputDecoration(labelText: 'Topic', filled: true),
-                validator: (value) {
-                  if (value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                },
-                onSaved: (String value) {
-                  setState(() {
-                    _hasTopic = value.isNotEmpty;
-                  });
-                  if (_hasTopic) {
-                    _topicContent = value;
-                  }
-                },
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                alignment: Alignment.bottomLeft,
+                child: TextFormField(
+                  decoration:
+                      const InputDecoration(labelText: 'Topic', filled: true),
+                  validator: (String? value) {
+                    if (value?.isEmpty ?? true) {
+                      return 'Please enter some text';
+                    }
+                    return null;
+                  },
+                  onSaved: (String? value) {
+                    setState(() {
+                      _hasTopic = value?.isNotEmpty ?? false;
+                    });
+                    if (_hasTopic) {
+                      _topicContent = value!;
+                    }
+                  },
+                ),
               ),
-            ),
-            _buildQosChoiceChips(),
-            Container(
-              decoration: BoxDecoration(
-                  border:
-                      Border(bottom: BorderSide(color: theme.dividerColor))),
-              child: Row(
-                children: <Widget>[
-                  Checkbox(
+              _buildQosChoiceChips(),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: theme.dividerColor),
+                  ),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Checkbox(
                       value: _retainValue,
-                      onChanged: (bool value) {
+                      onChanged: (bool? value) {
                         setState(() {
-                          _retainValue = value;
+                          _retainValue = value ?? false;
                           _saveNeeded = true;
                         });
-                      }),
-                  const Text('Retained'),
-                ],
+                      },
+                    ),
+                    const Text('Retained'),
+                  ],
+                ),
               ),
-            )
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Wrap _buildQosChoiceChips() {
+  Widget _buildQosChoiceChips() {
     return Wrap(
       spacing: 4.0,
       children: List<Widget>.generate(
@@ -123,47 +144,57 @@ class _SendMessageDialogState extends State<SendMessageDialog> {
             selected: _qosValue == index,
             onSelected: (bool selected) {
               setState(() {
-                _qosValue = selected ? index : null;
+                _qosValue = selected ? index : _qosValue;
               });
             },
           );
         },
-      ).toList(),
+      ),
     );
   }
 
-  Future<bool> _onWillPop() async {
+  Future<void> _onWillPop() async {
     _saveNeeded = _hasTopic || _hasMessage || _saveNeeded;
 
-    if (!_saveNeeded) return true;
+    if (!_saveNeeded) {
+      Navigator.of(context).pop();
+      return;
+    }
 
     final ThemeData theme = Theme.of(context);
-    final TextStyle dialogTextStyle =
-        theme.textTheme.subhead.copyWith(color: theme.textTheme.caption.color);
+    final TextStyle dialogTextStyle = theme.textTheme.titleMedium!
+        .copyWith(color: theme.textTheme.bodySmall!.color);
 
-    return await showDialog<bool>(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              content: Text('Discard message?', style: dialogTextStyle),
-              actions: <Widget>[
-                FlatButton(
-                    child: const Text('CANCEL'),
-                    onPressed: () {
-                      Navigator.of(context).pop(
-                          false); // Pops the confirmation dialog but not the page.
-                    }),
-                FlatButton(
-                    child: const Text('DISCARD'),
-                    onPressed: () {
-                      Navigator.of(context).pop(
-                          true); // Returning true to _onWillPop will pop again.
-                    })
-              ],
-            );
-          },
-        ) ??
-        false;
+    final bool? discard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Text('Discard message?', style: dialogTextStyle),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('CANCEL'),
+              onPressed: () {
+                // Pops the confirmation dialog but not the page.
+                Navigator.of(context).pop(false);
+              },
+            ),
+            TextButton(
+              child: const Text('DISCARD'),
+              onPressed: () {
+                // Returning true will pop the page as well.
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (discard ?? false) {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   void _sendMessage() {
@@ -171,10 +202,10 @@ class _SendMessageDialogState extends State<SendMessageDialog> {
         mqtt.MqttClientPayloadBuilder();
 
     builder.addString(_messageContent);
-    widget.client.publishMessage(
+    widget.client?.publishMessage(
       _topicContent,
       mqtt.MqttQos.values[_qosValue],
-      builder.payload,
+      builder.payload!,
       retain: _retainValue,
     );
     Navigator.pop(context);

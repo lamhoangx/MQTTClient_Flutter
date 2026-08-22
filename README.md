@@ -6,8 +6,8 @@ Extends from https://github.com/shamblett/mqtt_client/tree/master/example/flutte
 
 ## Getting Started
 
-You can install packages mqtt_client from the command line:
-    `$ flutter packages get`
+Requires Flutter 3.x (Dart 3). Install packages from the command line:
+    `$ flutter pub get`
     
 ## Screenshots
 <img src="screenshots/full.png" height="400" alt="Screenshots"/>

@@ -1,22 +1,22 @@
 name: mqtt_client_example
-description: Demonstrates how to use mqtt_client with flutter.
-version: 1.0.0+1
+description: Demonstrates how to use mqtt_client with Flutter.
+publish_to: 'none'
+version: 2.0.0+2
 
 environment:
-  sdk: ">=2.0.0-dev.68.0 <3.0.0"
+  sdk: ^3.0.0
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^0.1.2
-  mqtt_client: ^5.2.0
+  cupertino_icons: ^1.0.8
+  mqtt_client: ^10.6.0
+  collection: ^1.19.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # mqtt_client:
-  #   path: ../../
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

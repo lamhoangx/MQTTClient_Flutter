@@ -4,128 +4,124 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:mqtt_client/mqtt_client.dart' as mqtt;
-import 'package:mqtt_client_example/models/message.dart';
+import 'package:mqtt_client/mqtt_server_client.dart' as mqtt;
 import 'package:mqtt_client_example/dialogs/send_message.dart';
+import 'package:mqtt_client_example/models/message.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(const MyApp());
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
-  PageController _pageController;
+  final PageController _pageController = PageController();
   int _page = 0;
 
-  String titleBar         = 'MQTT';
-  String broker           = 'm15.cloudmqtt.com';
-  int port                = 14375;
-  String username         = 'wbpwjaso';
-  String passwd           = 'eO-kjpnhyvrI';
+  static const String titleBar = 'MQTT';
+
+  // Default broker environment for testing (see README).
+  String broker = 'm15.cloudmqtt.com';
+  int port = 14375;
+  String username = 'wbpwjaso';
+  String passwd = 'eO-kjpnhyvrI';
   String clientIdentifier = 'lamhx';
 
-  mqtt.MqttClient client;
-  mqtt.MqttConnectionState connectionState;
+  mqtt.MqttServerClient? client;
 
-  StreamSubscription subscription;
+  StreamSubscription<List<mqtt.MqttReceivedMessage<mqtt.MqttMessage>>>?
+      subscription;
 
-  TextEditingController brokerController = TextEditingController();
-  TextEditingController portController = TextEditingController();
-  TextEditingController usernameController = TextEditingController();
-  TextEditingController passwdController = TextEditingController();
-  TextEditingController identifierController = TextEditingController();
+  final TextEditingController brokerController = TextEditingController();
+  final TextEditingController portController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwdController = TextEditingController();
+  final TextEditingController identifierController = TextEditingController();
 
-  TextEditingController topicController = TextEditingController();
-  Set<String> topics = Set<String>();
+  final TextEditingController topicController = TextEditingController();
+  final Set<String> topics = <String>{};
 
-  List<Message> messages = <Message>[];
-  ScrollController messageController = ScrollController();
+  final List<Message> messages = <Message>[];
+  final ScrollController messageController = ScrollController();
+
+  /// Single source of truth for the connection state, read straight from the
+  /// client so it can never go stale.
+  bool get isConnected =>
+      client?.connectionStatus?.state == mqtt.MqttConnectionState.connected;
 
   @override
   Widget build(BuildContext context) {
-    IconData connectionStateIcon;
-    switch (client?.connectionState) {
-      case mqtt.MqttConnectionState.connected:
-        connectionStateIcon = Icons.cloud_done;
-        break;
-      case mqtt.MqttConnectionState.disconnected:
-        connectionStateIcon = Icons.cloud_off;
-        break;
-      case mqtt.MqttConnectionState.connecting:
-        connectionStateIcon = Icons.cloud_upload;
-        break;
-      case mqtt.MqttConnectionState.disconnecting:
-        connectionStateIcon = Icons.cloud_download;
-        break;
-      case mqtt.MqttConnectionState.faulted:
-        connectionStateIcon = Icons.error;
-        break;
-      default:
-        connectionStateIcon = Icons.cloud_off;
-    }
-    void navigationTapped(int page) {
-      _pageController.animateToPage(page,
-          duration: const Duration(milliseconds: 300), curve: Curves.ease);
-    }
-
-    void onPageChanged(int page) {
-      setState(() {
-        this._page = page;
-      });
-    }
+    final IconData connectionStateIcon =
+        _iconForState(client?.connectionStatus?.state);
 
     return MaterialApp(
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        useMaterial3: true,
+      ),
       home: Scaffold(
         appBar: AppBar(
           title: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text(titleBar),
-              SizedBox(
-                width: 8.0,
-              ),
+              const Text(titleBar),
+              const SizedBox(width: 8.0),
               Icon(connectionStateIcon),
             ],
           ),
         ),
         floatingActionButton: _page == 2
-            ? Builder(builder: (BuildContext context) {
-                return FloatingActionButton(
-                  child: Icon(Icons.add),
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute<String>(
-                          builder: (BuildContext context) =>
-                              SendMessageDialog(client: client),
-                          fullscreenDialog: true,
-                        ));
-                  },
-                );
-              })
+            ? FloatingActionButton(
+                child: const Icon(Icons.add),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<String>(
+                      builder: (BuildContext context) =>
+                          SendMessageDialog(client: client),
+                      fullscreenDialog: true,
+                    ),
+                  );
+                },
+              )
             : null,
-        bottomNavigationBar: BottomNavigationBar(
-          onTap: navigationTapped,
-          currentIndex: _page,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.cloud),
-              title: Text('Broker'),
+        bottomNavigationBar: NavigationBar(
+          onDestinationSelected: (int page) {
+            _pageController.animateToPage(
+              page,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.ease,
+            );
+          },
+          selectedIndex: _page,
+          destinations: const <Widget>[
+            NavigationDestination(
+              icon: Icon(Icons.cloud_outlined),
+              selectedIcon: Icon(Icons.cloud),
+              label: 'Broker',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.playlist_add),
-              title: Text('Subscriptions'),
+            NavigationDestination(
+              icon: Icon(Icons.playlist_add_outlined),
+              selectedIcon: Icon(Icons.playlist_add),
+              label: 'Subscriptions',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.message),
-              title: Text('Messages'),
+            NavigationDestination(
+              icon: Icon(Icons.message_outlined),
+              selectedIcon: Icon(Icons.message),
+              label: 'Messages',
             ),
           ],
         ),
         body: PageView(
           controller: _pageController,
-          onPageChanged: onPageChanged,
+          onPageChanged: (int page) {
+            setState(() {
+              _page = page;
+            });
+          },
           children: <Widget>[
             _buildBrokerPage(connectionStateIcon),
             _buildSubscriptionsPage(),
@@ -136,96 +132,116 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  Column _buildBrokerPage(IconData connectionStateIcon) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            SizedBox( //Input Broker
-              width: 200.0,
-              child: TextField(
-                controller: brokerController,
-                decoration: InputDecoration(hintText: 'Input broker'),
-              ),
-            ),
-            SizedBox( //Input Port
-              width: 200.0,
-              child: TextField(
-                controller: portController,
-                decoration: InputDecoration(hintText: 'Port'),
-              ),
-            ),
-            SizedBox( //Username
-              width: 200.0,
-              child: TextField(
-                controller: usernameController,
-                decoration: InputDecoration(hintText: 'Username'),
-              ),
-            ),
-            SizedBox( //Passwd
-              width: 200.0,
-              child: TextField(
-                controller: passwdController,
-                decoration: InputDecoration(hintText: 'Passwd'),
-              ),
-            ),
-            SizedBox( //Passwd
-              width: 200.0,
-              child: TextField(
-                controller: identifierController,
-                decoration: InputDecoration(hintText: 'Client Identifier'),
-              ),
-            ),
-            SizedBox(height: 8.0),
-            Text(
-              broker + ':' + port.toString(),
-              style: TextStyle(fontSize: 24.0),
-            ),
-            SizedBox(width: 8.0),
-            Icon(connectionStateIcon),
-          ],
-        ),
-        SizedBox(height: 8.0),
-        RaisedButton(
-          child: Text(client?.connectionState == mqtt.MqttConnectionState.connected
-              ? 'Disconnect'
-              : 'Connect'),
-          onPressed: () {
-            if(brokerController.value.text.isNotEmpty) {
-              broker = brokerController.value.text;
-            }
+  IconData _iconForState(mqtt.MqttConnectionState? state) {
+    switch (state) {
+      case mqtt.MqttConnectionState.connected:
+        return Icons.cloud_done;
+      case mqtt.MqttConnectionState.connecting:
+        return Icons.cloud_upload;
+      case mqtt.MqttConnectionState.disconnecting:
+        return Icons.cloud_download;
+      case mqtt.MqttConnectionState.faulted:
+        return Icons.error;
+      case mqtt.MqttConnectionState.disconnected:
+      case null:
+        return Icons.cloud_off;
+    }
+  }
 
-            port = int.tryParse(portController.value.text);
-            if(port == null) {
-              port = 14375;
-            }
-            if(usernameController.value.text.isNotEmpty) {
-              username = usernameController.value.text;
-            }
-            if(passwdController.value.text.isNotEmpty) {
-              passwd = passwdController.value.text;
-            }
-            
-            clientIdentifier = identifierController.value.text;
-            if(clientIdentifier.isEmpty) {
-              var random = new Random();
-              clientIdentifier = 'lamhx_' + random.nextInt(100).toString();
-            }
+  Widget _buildBrokerPage(IconData connectionStateIcon) {
+    return Form(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: brokerController,
+                  decoration: const InputDecoration(labelText: 'Input broker'),
+                ),
+              ),
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: portController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Port'),
+                ),
+              ),
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(labelText: 'Username'),
+                ),
+              ),
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: passwdController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Passwd'),
+                ),
+              ),
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: identifierController,
+                  decoration:
+                      const InputDecoration(labelText: 'Client Identifier'),
+                ),
+              ),
+              const SizedBox(height: 8.0),
+              Text(
+                '$broker:$port',
+                style: const TextStyle(fontSize: 24.0),
+              ),
+              const SizedBox(height: 8.0),
+              Icon(connectionStateIcon),
+              const SizedBox(height: 16.0),
+              FilledButton(
+                child: Text(isConnected ? 'Disconnect' : 'Connect'),
+                onPressed: () {
+                  if (brokerController.value.text.isNotEmpty) {
+                    broker = brokerController.value.text;
+                  }
 
-            if (client?.connectionState == mqtt.MqttConnectionState.connected) {
-              _disconnect();
-            } else {
-              _connect();
-            }
-          },
+                  final int? parsedPort =
+                      int.tryParse(portController.value.text);
+                  if (parsedPort != null) {
+                    port = parsedPort;
+                  }
+                  if (usernameController.value.text.isNotEmpty) {
+                    username = usernameController.value.text;
+                  }
+                  if (passwdController.value.text.isNotEmpty) {
+                    passwd = passwdController.value.text;
+                  }
+
+                  clientIdentifier = identifierController.value.text;
+                  if (clientIdentifier.isEmpty) {
+                    final Random random = Random();
+                    clientIdentifier = 'lamhx_${random.nextInt(100)}';
+                  }
+
+                  if (isConnected) {
+                    _disconnect();
+                  } else {
+                    _connect();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
-  Column _buildMessagesPage() {
+  Widget _buildMessagesPage() {
     return Column(
       children: <Widget>[
         Expanded(
@@ -236,86 +252,93 @@ class _MyAppState extends State<MyApp> {
         ),
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: RaisedButton(
-            child: Text('Clear'),
+          child: OutlinedButton(
+            child: const Text('Clear'),
             onPressed: () {
               setState(() {
                 messages.clear();
               });
             },
           ),
-        )
+        ),
       ],
     );
   }
 
-  Column _buildSubscriptionsPage() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            SizedBox(
-              width: 200.0,
-              child: TextField(
-                controller: topicController,
-                decoration: InputDecoration(hintText: 'Please enter a topic'),
+  Widget _buildSubscriptionsPage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 280.0,
+                child: TextField(
+                  controller: topicController,
+                  decoration: const InputDecoration(
+                    labelText: 'Please enter a topic',
+                  ),
+                ),
               ),
-            ),
-            SizedBox(width: 8.0),
-            RaisedButton(
-              child: Text('add topic'),
-              onPressed: () {
-                _subscribeToTopic(topicController.value.text);
-              },
-            ),
-          ],
-        ),
-        SizedBox(height: 16.0),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 4.0,
-          alignment: WrapAlignment.start,
-          children: _buildTopicList(),
-        )
-      ],
+              const SizedBox(width: 8.0),
+              FilledButton(
+                child: const Text('Add topic'),
+                onPressed: () {
+                  _subscribeToTopic(topicController.value.text);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16.0),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            alignment: WrapAlignment.start,
+            children: _buildTopicList(),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   void dispose() {
     subscription?.cancel();
+    _pageController.dispose();
+    messageController.dispose();
+    brokerController.dispose();
+    portController.dispose();
+    usernameController.dispose();
+    passwdController.dispose();
+    identifierController.dispose();
+    topicController.dispose();
     super.dispose();
-  }
-
-  @override
-  void initState() {
-    _pageController = PageController();
-    super.initState();
   }
 
   List<Widget> _buildMessageList() {
     return messages
         .map((Message message) => Card(
-              color: Colors.white70,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: ListTile(
                 trailing: CircleAvatar(
-                    radius: 14.0,
-                    backgroundColor: Theme.of(context).accentColor,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Text(
-                          'QoS',
-                          style: TextStyle(fontSize: 8.0),
-                        ),
-                        Text(
-                          message.qos.index.toString(),
-                          style: TextStyle(fontSize: 8.0),
-                        ),
-                      ],
-                    )),
+                  radius: 14.0,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      const Text(
+                        'QoS',
+                        style: TextStyle(fontSize: 8.0),
+                      ),
+                      Text(
+                        message.qos.index.toString(),
+                        style: const TextStyle(fontSize: 8.0),
+                      ),
+                    ],
+                  ),
+                ),
                 title: Text(message.topic),
                 subtitle: Text(message.message),
                 dense: true,
@@ -342,146 +365,140 @@ class _MyAppState extends State<MyApp> {
         .toList();
   }
 
-  void _connect() async {
-    /// First create a client, the client is constructed with a broker name, client identifier
-    /// and port if needed. The client identifier (short ClientId) is an identifier of each MQTT
-    /// client connecting to a MQTT broker. As the word identifier already suggests, it should be unique per broker.
-    /// The broker uses it for identifying the client and the current state of the client. If you don’t need a state
-    /// to be hold by the broker, in MQTT 3.1.1 you can set an empty ClientId, which results in a connection without any state.
-    /// A condition is that clean session connect flag is true, otherwise the connection will be rejected.
-    /// The client identifier can be a maximum length of 23 characters. If a port is not specified the standard port
-    /// of 1883 is used.
-    /// If you want to use websockets rather than TCP see below.
-    /// 
-    client = mqtt.MqttClient(broker, '');
-    client.port = port;
-    
-    /// A websocket URL must start with ws:// or wss:// or Dart will throw an exception, consult your websocket MQTT broker
-    /// for details.
-    /// To use websockets add the following lines -:
-    /// client.useWebSocket = true;
-    /// client.port = 80;  ( or whatever your WS port is)
-    /// Note do not set the secure flag if you are using wss, the secure flags is for TCP sockets only.
+  Future<void> _connect() async {
+    /// Create a client with a broker name, client identifier and port.
+    /// MqttServerClient is the TCP/TLS client; use MqttClient for websockets.
+    /// The client identifier should be unique per broker — the broker uses it
+    /// to identify the client and its state.
+    final mqtt.MqttServerClient newClient =
+        mqtt.MqttServerClient(broker, clientIdentifier)
+          ..port = port
+          ..logging(on: false)
 
-    /// Set logging on if needed, defaults to off
-    client.logging(on: true);
+          /// Keep alive period, must agree with the connect message below.
+          ..keepAlivePeriod = 30
 
-    /// If you intend to use a keep alive value in your connect message that is not the default(60s)
-    /// you must set it here
-    client.keepAlivePeriod = 30;
+          /// Unsolicited disconnection callback.
+          ..onDisconnected = _onDisconnected
+          ..onConnected = _onConnected;
 
-    /// Add the unsolicited disconnection callback
-    client.onDisconnected = _onDisconnected;
-
-    /// Create a connection message to use or use the default one. The default one sets the
-    /// client identifier, any supplied username/password, the default keepalive interval(60s)
-    /// and clean session, an example of a specific one below.
+    /// Connection message: clean (non persistent) session, will message.
+    /// The keep alive period is set on the client above.
     final mqtt.MqttConnectMessage connMess = mqtt.MqttConnectMessage()
         .withClientIdentifier(clientIdentifier)
-        // Must agree with the keep alive set above or not set
-        .startClean() // Non persistent session for testing
-        .keepAliveFor(30)
-        // If you set this you must set a will message
+        .startClean()
         .withWillTopic('test/test')
         .withWillMessage('lamhx message test')
         .withWillQos(mqtt.MqttQos.atMostOnce);
-    print('MQTT client connecting....');
-    client.connectionMessage = connMess;
+    newClient.connectionMessage = connMess;
 
-    /// Connect the client, any errors here are communicated by raising of the appropriate exception. Note
-    /// in some circumstances the broker will just disconnect us, see the spec about this, we however will
-    /// never send malformed messages.
-    
+    debugPrint('MQTT client connecting to $broker:$port...');
     try {
-      await client.connect(username, passwd);
+      await newClient.connect(username, passwd);
     } catch (e) {
-      print(e);
-      _disconnect();
+      debugPrint('MQTT client connection error: $e');
+      newClient.disconnect();
     }
 
-    /// Check if we are connected
-    if (client.connectionState == mqtt.MqttConnectionState.connected) {
-      print('MQTT client connected');
+    if (!mounted) {
+      newClient.disconnect();
+      return;
+    }
+
+    if (newClient.connectionStatus?.state ==
+        mqtt.MqttConnectionState.connected) {
+      debugPrint('MQTT client connected');
       setState(() {
-        connectionState = client.connectionState;
+        client = newClient;
       });
+      subscription = newClient.updates!.listen(_onMessage);
     } else {
-      print('ERROR: MQTT client connection failed - '
-          'disconnecting, state is ${client.connectionState}');
-      _disconnect();
+      debugPrint('ERROR: MQTT client connection failed - '
+          'state is ${newClient.connectionStatus?.state}');
+      setState(() {
+        client = null;
+      });
     }
-
-    /// The client has a change notifier object(see the Observable class) which we then listen to to get
-    /// notifications of published updates to each subscribed topic.
-    subscription = client.updates.listen(_onMessage);
   }
 
   void _disconnect() {
-    client.disconnect();
+    client?.disconnect();
     _onDisconnected();
   }
 
   void _onDisconnected() {
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      topics.clear();
-      connectionState = client.connectionState;
-      client = null;
-      subscription.cancel();
+      subscription?.cancel();
       subscription = null;
+      topics.clear();
+      client = null;
     });
-    print('MQTT client disconnected');
+    debugPrint('MQTT client disconnected');
   }
 
-  void _onMessage(List<mqtt.MqttReceivedMessage> event) {
-    print(event.length);
+  void _onConnected() {
+    debugPrint('MQTT client connected callback');
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onMessage(List<mqtt.MqttReceivedMessage<mqtt.MqttMessage>> events) {
+    final mqtt.MqttReceivedMessage<mqtt.MqttMessage> event = events[0];
     final mqtt.MqttPublishMessage recMess =
-        event[0].payload as mqtt.MqttPublishMessage;
+        event.payload as mqtt.MqttPublishMessage;
     final String message =
         mqtt.MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
 
-    /// The above may seem a little convoluted for users only interested in the
-    /// payload, some users however may be interested in the received publish message,
-    /// lets not constrain ourselves yet until the package has been in the wild
-    /// for a while.
-    /// The payload is a byte buffer, this will be specific to the topic
-    print('MQTT message: topic is <${event[0].topic}>, '
-        'payload is <-- ${message} -->');
-    print(client.connectionState);
+    debugPrint('MQTT message: topic is <${event.topic}>, '
+        'payload is <-- $message -->');
+    if (!mounted) {
+      return;
+    }
     setState(() {
       messages.add(Message(
-        topic: event[0].topic,
+        topic: event.topic,
         message: message,
-        qos: recMess.payload.header.qos,
+        qos: recMess.header?.qos ?? mqtt.MqttQos.atMostOnce,
       ));
-      try {
-        messageController.animateTo(
-          0.0,
-          duration: Duration(milliseconds: 400),
-          curve: Curves.easeOut,
-        );
-      } catch (_) {
-        // ScrollController not attached to any scroll views.
-      }
+      // Scroll to the top where the newest message is shown, once this frame
+      // has attached the controller to the list view.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (messageController.hasClients) {
+          messageController.animateTo(
+            0.0,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     });
   }
 
   void _subscribeToTopic(String topic) {
-    if (connectionState == mqtt.MqttConnectionState.connected) {
+    final String trimmed = topic.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    if (isConnected) {
       setState(() {
-        if (topics.add(topic.trim())) {
-          print('Subscribing to ${topic.trim()}');
-          client.subscribe(topic, mqtt.MqttQos.exactlyOnce);
+        if (topics.add(trimmed)) {
+          debugPrint('Subscribing to $trimmed');
+          client?.subscribe(trimmed, mqtt.MqttQos.exactlyOnce);
         }
       });
     }
   }
 
   void _unsubscribeFromTopic(String topic) {
-    if (connectionState == mqtt.MqttConnectionState.connected) {
+    if (isConnected) {
       setState(() {
         if (topics.remove(topic.trim())) {
-          print('Unsubscribing from ${topic.trim()}');
-          client.unsubscribe(topic);
+          debugPrint('Unsubscribing from ${topic.trim()}');
+          client?.unsubscribe(topic.trim());
         }
       });
     }

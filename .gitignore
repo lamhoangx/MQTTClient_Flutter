@@ -3,3 +3,6 @@
 build/
 
 .flutter-plugins
+
+# Flutter/Dart
+.dart_tool/
