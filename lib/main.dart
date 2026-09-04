@@ -24,10 +24,13 @@ class _MyAppState extends State<MyApp> {
   static const String titleBar = 'MQTT';
 
   // Default broker environment for testing (see README).
-  String broker = 'm15.cloudmqtt.com';
-  int port = 14375;
-  String username = 'wbpwjaso';
-  String passwd = 'eO-kjpnhyvrI';
+  // CloudAMQP: on shared plans the vhost equals the username and must be
+  // appended to it as 'vhost:username'. Port 8883 is MQTT over TLS,
+  // 1883 is plain MQTT.
+  String broker = 'your-instance.lmq.us-east-1.aws.cloudamqp.com';
+  int port = 8883;
+  String username = 'your-username:your-username';
+  String passwd = 'your-password';
   String clientIdentifier = 'lamhx';
 
   mqtt.MqttServerClient? client;
@@ -373,6 +376,10 @@ class _MyAppState extends State<MyApp> {
     final mqtt.MqttServerClient newClient =
         mqtt.MqttServerClient(broker, clientIdentifier)
           ..port = port
+
+          /// CloudAMQP serves TLS-wrapped MQTT on 8883, plain TCP on 1883.
+          /// (The client defaults to MQTT 3.1, which is what CloudAMQP speaks.)
+          ..secure = port == 8883
           ..logging(on: false)
 
           /// Keep alive period, must agree with the connect message below.
@@ -487,7 +494,10 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         if (topics.add(trimmed)) {
           debugPrint('Subscribing to $trimmed');
-          client?.subscribe(trimmed, mqtt.MqttQos.exactlyOnce);
+
+          /// CloudAMQP supports QoS 0 and 1 only; requesting more gets
+          /// downgraded to 1 by the broker anyway.
+          client?.subscribe(trimmed, mqtt.MqttQos.atLeastOnce);
         }
       });
     }

@@ -17,16 +17,20 @@ https://youtu.be/ZDa0UNjTGzw
 
 
 ## 
-You can setup a server through [cloundmqtt](https://cloudmqtt.com) or [mosquitto](http://test.mosquitto.org/) for the testing.
-By default in code, information environment for testing is:
+You can setup a server through [CloudAMQP](https://www.cloudamqp.com) (see the [MQTT docs](https://www.cloudamqp.com/docs/mqtt.html)) or [mosquitto](http://test.mosquitto.org/) for the testing.
+
+CloudAMQP notes:
+- The username must carry the vhost: use `vhost:username` (on shared plans the vhost is the same as the username, e.g. `my-user:my-user`).
+- Port `8883` is MQTT over TLS, port `1883` is plain MQTT. Only QoS 0 and 1 are supported.
+
+By default in code, information environment for testing is (replace with your own instance's values):
 ```dart
-    String broker           = 'm15.cloudmqtt.com';
-    int    port             = 14375;
-    String username         = 'wbpwjaso';
-    String passwd           = 'eO-kjpnhyvrI';
+    String broker           = 'your-instance.lmq.us-east-1.aws.cloudamqp.com';
+    int    port             = 8883;
+    String username         = 'your-username:your-username';
+    String passwd           = 'your-password';
     String clientIdentifier = 'lamhx';
 ```
-If it does not work, the service has stopped.
 
 -------
 Hope doing well and happy testing!
